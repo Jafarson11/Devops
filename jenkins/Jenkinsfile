@@ -1,3 +1,4 @@
+@"
 pipeline {
     agent any
     
@@ -19,7 +20,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    sh 'terraform init'
+                    bat 'terraform init'
                 }
             }
         }
@@ -27,7 +28,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    sh 'terraform plan -out=tfplan'
+                    bat 'terraform plan -out=tfplan'
                 }
             }
         }
@@ -35,7 +36,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve tfplan'
+                    bat 'terraform apply -auto-approve tfplan'
                 }
             }
         }
@@ -44,7 +45,7 @@ pipeline {
             steps {
                 dir('app') {
                     echo 'Building Python application...'
-                    sh 'pip install -r requirements.txt'
+                    bat 'pip install -r requirements.txt'
                 }
             }
         }
@@ -53,8 +54,8 @@ pipeline {
             steps {
                 echo 'Deploying application to Azure App Service...'
                 dir('app') {
-                    sh '''
-                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                    bat '''
+                        az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
                         az webapp up --name devops-webapp-yourname123 --resource-group devops-project-rg --runtime "PYTHON:3.9"
                     '''
                 }
@@ -71,3 +72,4 @@ pipeline {
         }
     }
 }
+"@
