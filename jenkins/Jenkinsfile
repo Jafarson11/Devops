@@ -17,16 +17,37 @@ pipeline {
             }
         }
         
+        stage('Azure Login') {
+            steps {
+                echo 'Logging into Azure...'
+                bat '''
+                    az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
+                    az account set --subscription %AZURE_SUBSCRIPTION_ID%
+                '''
+            }
+        }
+        
         stage('Terraform Init') {
             steps {
+                echo 'Initializing Terraform...'
                 dir('terraform') {
-                    bat 'terraform init'
+                    bat 'terraform init -upgrade'
+                }
+            }
+        }
+        
+        stage('Terraform Validate') {
+            steps {
+                echo 'Validating Terraform configuration...'
+                dir('terraform') {
+                    bat 'terraform validate'
                 }
             }
         }
         
         stage('Terraform Plan') {
             steps {
+                echo 'Planning Terraform changes...'
                 dir('terraform') {
                     bat 'terraform plan -out=tfplan'
                 }
@@ -35,6 +56,7 @@ pipeline {
         
         stage('Terraform Apply') {
             steps {
+                echo 'Applying Terraform changes...'
                 dir('terraform') {
                     bat 'terraform apply -auto-approve tfplan'
                 }
@@ -43,21 +65,18 @@ pipeline {
         
         stage('Build Application') {
             steps {
+                echo 'Installing Python dependencies...'
                 dir('app') {
-                    echo 'Building Python application...'
                     bat 'pip install -r requirements.txt'
                 }
             }
         }
         
-        stage('Deploy to Azure') {
+        stage('Deploy to Azure App Service') {
             steps {
-                echo 'Deploying application to Azure App Service...'
+                echo 'Deploying Flask application to Azure...'
                 dir('app') {
-                    bat '''
-                        az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
-                        az webapp up --name devops-webapp-yourname123 --resource-group devops-project-rg --runtime "PYTHON:3.9"
-                    '''
+                    bat 'az webapp up --name devops-webapp-yourname123 --resource-group devops-project-rg --runtime PYTHON:3.9 --location eastasia'
                 }
             }
         }
@@ -65,10 +84,14 @@ pipeline {
     
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo '✅ Pipeline executed successfully!'
+            echo 'Application deployed to Azure App Service'
         }
         failure {
-            echo 'Pipeline execution failed!'
+            echo '❌ Pipeline execution failed!'
+        }
+        always {
+            echo 'Cleaning up...'
         }
     }
 }
