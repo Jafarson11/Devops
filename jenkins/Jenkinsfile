@@ -7,19 +7,21 @@ pipeline {
         AZURE_TENANT_ID = credentials('azure-tenant-id')
         AZURE_CLIENT_ID = credentials('azure-client-id')
         AZURE_CLIENT_SECRET = credentials('azure-client-secret')
+        APP_NAME = 'devops-webapp-yourname123'
+        RESOURCE_GROUP = 'devops-project-rg'
     }
     
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out code from GitHub...'
+                echo '✅ Checking out code from GitHub...'
                 checkout scm
             }
         }
         
         stage('Azure Login') {
             steps {
-                echo 'Logging into Azure...'
+                echo '🔐 Logging into Azure...'
                 bat '''
                     az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
                     az account set --subscription %AZURE_SUBSCRIPTION_ID%
@@ -27,71 +29,59 @@ pipeline {
             }
         }
         
-        stage('Terraform Init') {
+        stage('Verify Infrastructure') {
             steps {
-                echo 'Initializing Terraform...'
-                dir('terraform') {
-                    bat 'terraform init -upgrade'
-                }
-            }
-        }
-        
-        stage('Terraform Validate') {
-            steps {
-                echo 'Validating Terraform configuration...'
-                dir('terraform') {
-                    bat 'terraform validate'
-                }
-            }
-        }
-        
-        stage('Terraform Plan') {
-            steps {
-                echo 'Planning Terraform changes...'
-                dir('terraform') {
-                    bat 'terraform plan -out=tfplan'
-                }
-            }
-        }
-        
-        stage('Terraform Apply') {
-            steps {
-                echo 'Applying Terraform changes...'
-                dir('terraform') {
-                    bat 'terraform apply -auto-approve tfplan'
-                }
+                echo '🔍 Verifying Azure infrastructure exists...'
+                bat '''
+                    az group show --name %RESOURCE_GROUP%
+                    az webapp show --name %APP_NAME% --resource-group %RESOURCE_GROUP%
+                '''
             }
         }
         
         stage('Build Application') {
             steps {
-                echo 'Installing Python dependencies...'
+                echo '🔨 Installing Python dependencies...'
                 dir('app') {
-                    bat 'pip install -r requirements.txt'
+                    bat '''
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+                    '''
                 }
             }
         }
         
         stage('Deploy to Azure App Service') {
             steps {
-                echo 'Deploying Flask application to Azure...'
+                echo '🚀 Deploying Flask application to Azure...'
                 dir('app') {
-                    bat 'az webapp up --name devops-webapp-yourname123 --resource-group devops-project-rg --runtime PYTHON:3.9 --location eastasia'
+                    bat '''
+                        az webapp up --name %APP_NAME% --resource-group %RESOURCE_GROUP% --runtime PYTHON:3.9 --location eastasia --sku B1
+                    '''
                 }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                echo '✅ Verifying deployment...'
+                bat '''
+                    az webapp show --name %APP_NAME% --resource-group %RESOURCE_GROUP% --query "defaultHostName" -o tsv
+                '''
             }
         }
     }
     
     post {
         success {
-            echo '✅ Pipeline executed successfully!'
-            echo 'Application deployed to Azure App Service'
+            echo '✅✅✅ Pipeline executed successfully! ✅✅✅'
+            echo '🌐 Application URL: https://%APP_NAME%.azurewebsites.net'
         }
         failure {
             echo '❌ Pipeline execution failed!'
         }
         always {
-            echo 'Cleaning up...'
+            echo '🧹 Cleaning up workspace...'
         }
     }
 }
